@@ -23,6 +23,7 @@
 
 3. 実例3: ミナミマグロ
    - zero catchを多く含むときの解析: delta GLM / zero inflated model
+   - delta GLMによる海区分け
    - 空間自己相関を扱ったモデル2: VAST
 
 
