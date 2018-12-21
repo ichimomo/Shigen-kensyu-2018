@@ -27,8 +27,9 @@
    - 空間自己相関を扱ったモデル2: VAST
 
 
-※ RのパッケージAER, MASS, mgcv, arm, lme4, spdep, CARBayes，speedglmを使いますので，実演したい人は各自でインストールお願いいたします。install.packages("パッケージ名")で大体のパッケージがインストールできると思います。できない場合はCRANのサイトからSource fileをダウンロードして、手動でインストールをお願いします。
+※ RのパッケージAER, MASS, mgcv, arm, lme4, spdep, CARBayes，speedglm, maps, maptoolsを使う予定ですので，実演したい人は各自でインストールお願いいたします。install.packages("パッケージ名")で大体のパッケージがインストールできると思います。できない場合はCRANのサイトからSource fileをダウンロードして、手動でインストールをお願いします。
 
 ※ また、以下のサイトに示されている手順に従って、TMB, INLA, VASTのパッケージのインストールもお願いします。
 https://github.com/James-Thorson/VAST
-VASTをインストールする際に「パッケージ"XXX"がインストールできませんでした」といったエラーが出ることがあります。その場合は、install.packages("XXX")を行ってインストールした後に、再度VASTのインスールの実行をお願いします。
+
+VASTをインストールする際に「パッケージ"XXX"がインストールできませんでした」といったエラーが出ることがあります。その場合は、install.packages("XXX")を行ってインストールした後に、再度VASTのインストールの実行をお願いします。
