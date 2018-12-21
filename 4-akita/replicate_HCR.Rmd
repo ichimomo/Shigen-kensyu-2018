@@ -1,0 +1,207 @@
+---
+title: "簡単な漁業制御ルールの再現（工事中）"
+author: "秋田 鉄也"
+date: "2018/12/21 17:00"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 講習はパワーポイントのスライドを用いて、数式やコードを使わずに発表予定です
+
+## 0. データのセット
+
+齢構成がある種を対象として、簡単な漁業制御ルールをコンピューター上で再現することを目指す。以下のような状況を順に考えよう。
+
+1. 漁業がない状況
+2. 漁業が開始され資源が減少する過程
+3. 管理基準値に基づいた資源管理が実施される過程
+
+例えば、下記のような資源を考えよう。
+
+```{r set_biological_property}
+options(digits=4) # 出力を見やすくするため
+age <- 10 # 最大年齢クラス（この場合０〜９歳）
+maturity_age <- 5 # 成熟年齢
+M_at_age <- rep(0.3,age) # 自然死亡率は齢に依らず一定と仮定 
+Q_at_age <- c(rep(0,maturity_age),rep(1,age-maturity_age)) # 成熟年齢に達すると100%成熟すると仮定 
+```
+
+なお、性別については区別しない。重量については以下のようにvon-Bertalanffy式
+$$
+W(a)=w_{\infty} ( 1-{\rm exp}[-K(a-a_0)] )^b
+$$
+を仮定した。今回は詳細には立ち入らない。
+
+```{r weight}
+# パラメータ
+VB_a0 <- -0.1
+VB_b <- 3
+VB_K <- 0.5
+VB_winf <- 10
+
+VB <- function(a){
+  VB_winf*(1 - exp(-VB_K*(a-VB_a0)) )^VB_b 
+}
+
+W_at_age <- sapply(seq(0,age-1,1),VB)
+plot(seq(0,(age-1),1),W_at_age,xlab = "age",ylab = "weight (kg)",main = "weight at age",type = "b")
+```
+
+再生産関係についてはBeverton Holt式
+$$
+R=\frac{a SSB}{b + SSB}
+$$
+を採用した。以下、加入個体数を$R$、産卵親魚重量を$SSB$(Spwainig Stock Biomass)と記載することがある。
+
+```{r SR_relationship}
+# パラメータ
+BH_a <- 1
+BH_b <- 1
+
+BH <- function(SSB,BH_a,BH_b){
+  R <- BH_a * SSB / (BH_b + SSB)
+  return(R)
+}
+curve(BH(x,BH_a,BH_b),from = 0,to = 10,xlab = "SSB (weight)",ylab = "Recruitment (number)",main="S-R relationship")
+```
+
+再生産関係をシミュレーションで再現する際に採用されたパラメータ($a$,$b$)の値は、管理基準値を計算する時に推定するが、今回は詳細には立ち入らない。また、単位（重量・尾数）は後から設定できるので、深く考えないで進める。
+
+## 1. 漁業がない状況
+
+0歳個体が5（単位）個体存在する状況を初期状態として10年後を見ることで、漁業がない状況における個体群動態を再現してみよう。理解のために、まずは環境変動はないと仮定する。
+
+```{r without_fishing}
+burn_in <- 10 # 計算年数
+SSB_init <- 5 # 初期加入個体
+SSB <- c(SSB_init,rep(0,burn_in))
+N_at_age <- rep(0,age)
+for (y in 1:burn_in) {
+  for (a in 1:age){
+    if(a==1) {
+      N_at_age[a] <- BH(SSB[y],BH_a,BH_b)  
+    }else{
+      N_at_age[a] <- N_at_age[a-1] * exp(-M_at_age[a-1]) # exp[-M]は年生存率
+    }
+  }
+  SSB[y+1] <- sum(N_at_age*Q_at_age*W_at_age)
+}
+print(SSB)
+plot(1:burn_in,SSB[1:burn_in],type = "b",xlab = "year",ylab = "SSB",main = "without fishing")
+```
+
+漁業がない場合、SSB=4.811が釣り合った（平衡）状態となる。平衡状態では、以下の2式
+$$
+R=\frac{a SSB}{b + SSB}
+$$
+$$
+SSB=SPR|_{F=0} R
+$$
+
+を満たす($SSB$,$R$)の組み合わせが選ばれる。$SPR|_{F=0}$は、漁業がない場合の「加入あたりの産卵親魚量」に対応する。
+
+```{r SPR0}
+S_at_age <- c(1,rep(0,age-1))
+for (a in 1:(age-1)){
+  S_at_age[a+1] <- S_at_age[a] *exp(-M_at_age[a])
+}
+print(S_at_age) # 加入個体のx年後までの生存率(x=1~9)
+SPR0 <- sum(S_at_age * W_at_age * Q_at_age)
+print(SPR0) # 加入1個体の産卵親魚量(kg)への貢献量
+curve(expr =  BH_a * x / (BH_b + x),from = 0,to=6,xlab = "SSB",ylab = "R",main="equilibrium point")
+curve(expr = x/SPR0,add = T)
+```
+
+2つの関係式を図示してみると上のようになり、交点が平衡点に相当する。
+
+## 2. 漁業が開始され資源が減少する過程
+
+次に、漁獲係数F=0の強さで、漁業の操業を続ける状況を再現しよう。簡単のために、漁獲死亡係数は齢に依らず一定と仮定する。前にシミュレートした、漁業がない場合の最終年を初期状態として、50年間漁業を続ける場合を考える。今回は、不確実性（再生産関係と漁業）も含めてシミュレートする。その際、加入個体数や漁獲量に乗じる誤差項については、0以上の値をとり、平均1になるような対数正規乱数を選んだ。
+
+```{r with_fishing}
+SSB_init2 <- SSB[y+1] # 漁業がない状態を初期状態とする
+F_at_age <- rep(0.25,age) # 漁獲死亡係数は齢に依らず一定と仮定
+term <- 50 # 操業期間
+sd <- 0.3 # 加入の変動係数
+sd2 <- 0.1 # 漁獲の変動係数
+SSB2 <- c(SSB_init2,rep(0,term))
+Catch <- rep(0,term)
+N_at_age_mat <- F_tmp0 <- matrix(0,nrow = term+1,ncol=age)
+N_at_age_mat[1,] <- N_at_age
+for (y in 1:term) {
+  F_tmp0[y,] <- F_at_age * exp(rnorm(1,mean = 0,sd = sd2)-sd2^2/2)# 誤差の影響を含むので、毎年更新される
+  Catch[y] <- sum(
+    F_tmp0[y,]/(F_tmp0[y,]+M_at_age)*(1-exp(-F_tmp0[y,]-M_at_age))*N_at_age_mat[y,]*W_at_age
+  )
+  for (a in 1:age){
+    if(a==1) {
+      N_at_age_mat[y+1,a] <- BH(SSB2[y],BH_a,BH_b)* exp(rnorm(1,mean = 0,sd = sd)-sd^2/2)
+    }else{
+      N_at_age_mat[y+1,a] <- N_at_age_mat[y,a-1] * exp(-M_at_age[a-1]-F_tmp0[y,a-1]) # exp[-M-F]は年生存率
+    }
+  }
+  SSB2[y+1] <- sum(N_at_age_mat[y+1,]*Q_at_age*W_at_age)
+}
+print(SSB2)
+plot(1:term,SSB2[1:term],type = "b",xlab = "year",ylab = "SSB",main = "with_fishing")
+plot(1:term,Catch,type = "b",xlab = "year",ylab = "catch",main = "catch")
+```
+
+この漁獲死亡係数の下では、50年間で産卵親魚量が大きく減少することがわかる。同時に、漁獲量も開発初期から徐々に減少していく。SPRについても計算してみよう。
+
+```{r SPR}
+S_at_age <- c(1,rep(0,age-1))
+for (a in 1:(age-1)){
+  S_at_age[a+1] <- S_at_age[a] * exp(-M_at_age[a]-F_at_age[a])
+}
+SPR1 <- sum(S_at_age * W_at_age * Q_at_age)
+print(SPR1) # なお、a*SPR1 - b < 0で絶滅する
+print(SPR1/SPR0) # %SPR（漁業がない状態のSPRで割ったSPR）
+```
+
+%SPRは約21%と計算されるが、これは漁業がない状態を100%と考え、20%の産卵親魚量をとり残すような状況であることを示唆している。SPRが計算されたことから、（確率的変動がない場合の）平衡状態の($SSB$,$R$)も計算できる。
+
+```{r SR_relationship_with_fishing_equilibrium}
+curve(expr =  BH_a * x / (BH_b + x),from = 0,to=6,xlab = "SSB",ylab = "R")
+curve(expr = x/SPR0,add = T)
+curve(expr = x/SPR1,add = T)
+SSB_eq <- BH_a * SPR1 - BH_b # SSBとRに関する連立方程式を解くと出てくる
+points(x = SSB_eq, y=BH(SSB_eq,BH_a,BH_b))
+```
+
+交点はSSB=0よりも少し大きい所に存在する。さて、本来であれば漁獲量データやCPUE指標値などから標資源量の推定をすることで、産卵親魚量や加入量が推定されるのだが、今回はこれら50年分の値は既知としよう。これら50個の($SSB$,$R$)の組み合わせから再生産関係を推定してみる。今回は資源評価で利用されているコード"rvpa1.9.2.r"と"future2.1.r"をソースとして読み込んで、最尤推定を実施する。
+
+```{r SR_relationship_with_fishing_estimation}
+source("rvpa1.9.2.r")
+source("future2.1.r")
+SRdata <- get.SRdata(R.dat = N_at_age_mat[2:(term+1),1], SSB.dat = SSB2[1:term] )
+BH.par0 <- fit.SR(SRdata, SR = "BH", method = "L2", AR = 0, hessian = FALSE)
+plot.SRdata(SRdata)
+print(BH.par0$pars) # 推定結果(BH_a, BH_b, sd, 自己相関の強さ（今回は用いてない）)
+points(BH.par0$pred$SSB, BH.par0$pred$R, col = 3, type = "l", lwd = 3)
+```
+
+確率的挙動を含むことから、再生産関係の真の値は理論カーブから大きく揺らぐ。
+
+## 3. 管理基準値に基づいた資源管理が実施される過程
+
+これまで設定されていた漁獲強度は、未開発時の21%を取り残す程度の漁獲圧であった。水産資源解析の研究によると、30%~40%を取り残すのが良いとされている。そこで未開発時の30%を取り残すには、現状の漁獲圧からどれだけ減らさなくてはならないかを考えよう。
+
+```{r find_target_SPR}
+f_mulitplier <- seq(0,1.5,0.01)
+f_len <- length(f_mulitplier)
+SPR_res <- rep(0,f_len)
+for (i in 1:f_len){
+  
+  S_at_age <- c(1,rep(0,age-1))
+  for (a in 1:(age-1)){
+    S_at_age[a+1] <- S_at_age[a] * exp(-M_at_age[a]- f_mulitplier[i] * F_at_age[a])
+  }
+  SPR_res[i] <- sum(S_at_age * W_at_age * Q_at_age)/SPR0
+}
+```
+
+## 以下、工事中
