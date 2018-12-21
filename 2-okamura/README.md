@@ -17,3 +17,6 @@ N混合モデル
 Template Model Builderの実例
 
 （Rのパッケージ MuMIn，TMB（Rtoolsを事前に入れておく必要あり）を使いますので，実演したい人は各自でインストールお願いいたします）
+
+RtoolsのHP:
+https://cran.r-project.org/bin/windows/Rtools/
