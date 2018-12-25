@@ -146,8 +146,9 @@ for (y in 1:term) {
   SSB2[y+1] <- sum(N_at_age_mat[y+1,]*Q_at_age*W_at_age)
 }
 print(SSB2)
-plot(1:term,SSB2[1:term],type = "b",xlab = "year",ylab = "SSB",main = "with_fishing")
-plot(1:term,Catch,type = "b",xlab = "year",ylab = "catch",main = "catch")
+par(mfrow=c(1,2))
+plot(1:term,SSB2[1:term],type = "l",xlab = "year",ylab = "SSB",main = "SSB")
+plot(1:term,Catch,type = "l",xlab = "year",ylab = "catch",main = "catch")
 ```
 
 この漁獲死亡係数の下では、50年間で産卵親魚量が大きく減少することがわかる。同時に、漁獲量も開発初期から徐々に減少していく。SPRについても計算してみよう。
@@ -184,13 +185,14 @@ print(BH.par0$pars) # 推定結果(BH_a, BH_b, sd, 自己相関の強さ（今�
 points(BH.par0$pred$SSB, BH.par0$pred$R, col = 3, type = "l", lwd = 3)
 ```
 
-確率的挙動を含むことから、再生産関係の真の値は理論カーブから大きく揺らぐ。
+確率的挙動を含むことから、プロットされた値は理論カーブから大きくズレる。
 
 ## 3. 管理基準値に基づいた資源管理が実施される過程
 
 これまで設定されていた漁獲強度は、未開発時の21%を取り残す程度の漁獲圧であった。水産資源解析の研究によると、30%~40%を取り残すのが良いとされている。そこで未開発時の30%を取り残すには、現状の漁獲圧からどれだけ減らさなくてはならないかを考えよう。
 
 ```{r find_target_SPR}
+target_SPR <- 0.3
 f_mulitplier <- seq(0,1.5,0.01)
 f_len <- length(f_mulitplier)
 SPR_res <- rep(0,f_len)
@@ -202,6 +204,113 @@ for (i in 1:f_len){
   }
   SPR_res[i] <- sum(S_at_age * W_at_age * Q_at_age)/SPR0
 }
+min_tmp <- min(abs(SPR_res-target_SPR))
+limit_f <- f_mulitplier[which(abs(SPR_res-target_SPR)==min_tmp)]
+plot(f_mulitplier,SPR_res,xlab = "F_multiplier",ylab = "%SPR",main = "%SPR",type = "l")
+points(x = limit_f,y=target_SPR)
+print(1-limit_f) # %30SPRを実現するために、現状の漁獲圧に対して減らさなくてはならない漁獲強度
 ```
 
-## 以下、工事中
+現状より約24%程の漁獲圧の減少によって、%SPR=30%を達成できることがわかった。これら一連の議論は、現状の漁業と同一の選択率を仮定している点に注意。F_multiplierは、同一の選択率の強弱を決めるスカラー値である。F_multiplier=1の時は、現状の漁獲係数を意味している（%SPR=21%）。
+
+今回は、再生産関係の推定を必要としない漁獲制御ルールを採用する。制御ルールを定めるには、望ましい漁業状態と資源状態の両者を決める必要があった。前者については、%SPR=30%を達成するような漁獲圧としよう。後者については、SSB-Rプロットから推測される最大加入量の半分を実現するような産卵親魚量としよう。前者をFlimit、後者をBlimitと呼ぶことにする。
+
+```{r limitRP}
+F_limit_at_age <- limit_f*F_at_age
+print(F_limit_at_age)
+R0_est <- BH.par0$pars$a - BH.par0$pars$b/SPR0
+B_limit <- BH.par0$pars$b * R0_est/2 / (BH.par0$pars$a - R0_est/2) 
+print(B_limit)
+```
+
+今回は、推定された再生産関係を用いて、望ましい資源状態を計算しているが、実際はSSB-Rプロットから目視で決めたりすることも多い。
+
+```{r HCR}
+plot(NULL,xlim = c(0,2*B_limit),ylim = c(0,1.5),xlab = "SSB",ylab = "F/F_limit")
+curve(x/B_limit,from = 0,to = B_limit,add = T)
+curve(x*0+1,from = B_limit,to = 2*B_limit,add = T)
+```
+
+制御ルールは、上の関数に示したように決めよう。すなわち、
+
+1. 産卵親魚量がBlimitを上回る時：漁獲圧=Flimitを維持する
+2. 産卵親魚量がBlimitを下回る時：産卵親魚量に応じて漁獲圧をFlimitより減らす
+
+と定める。それでは、このルールに基づいた30年間の管理結果を見てみよう
+
+```{r under_management}
+SSB_init3 <- SSB2[y+1]
+term_management <- 30 
+N_at_age_mat_new <- F_tmp <- matrix(0,nrow = term_management+1,ncol=age)
+N_at_age_mat_new[1,] <- N_at_age_mat[term+1,]
+SSB3 <- c(SSB_init3,rep(0,term_management))
+Catch2 <- rep(0,term_management)
+#sd2 <- 0.1
+for(y in 1:term_management){
+  if(SSB3[y] < B_limit) {
+    F_tmp[y,] <- F_limit_at_age * SSB3[y] / B_limit * exp(rnorm(1,mean = 0,sd = sd2)-sd2^2/2)
+  }else {
+    F_tmp[y,] <- F_limit_at_age * exp(rnorm(1,mean = 0,sd = sd2)-sd2^2/2)
+  }
+  
+  Catch2[y] <- sum(
+    F_tmp[y,]/(F_tmp[y]+M_at_age)*(1-exp(-F_tmp[y]-M_at_age))*N_at_age_mat_new[y,]*W_at_age
+  )
+  
+  for (a in 1:age){
+    if(a==1) {
+      N_at_age_mat_new[y+1,a] <- BH(SSB3[y],BH_a,BH_b)* exp(rnorm(1,mean = 0,sd = sd)-sd^2/2)
+    }else{
+      N_at_age_mat_new[y+1,a] <- N_at_age_mat_new[y,a-1] * exp(-M_at_age[a-1]-F_tmp[y,a-1])
+    }
+  }
+  SSB3[y+1] <- sum(N_at_age_mat_new[y+1,]*Q_at_age*W_at_age)
+}
+par(mfrow=c(1,2))
+plot(1:(term + term_management),c(SSB2[1:term],SSB3[1:term_management]),type = "l",xlab = "year",ylab = "SSB",main = "SSB_under_management")
+abline(v=term+1,lty=2)
+abline(h=B_limit,col="red")
+plot(1:(term + term_management),c(Catch[1:term],Catch2[1:term_management]),type = "l",xlab = "year",ylab = "catch",main = "catch_under_management")
+abline(v=term+1,lty=2)
+```
+
+上の図の点線が管理開始年、赤色の水平線がBlimitである。管理を導入するに伴い、
+
+1. 漁獲量の短期的な減少
+2. 産卵親魚量の回復
+3. 漁獲量の回復
+
+という順番に漁業状態および資源状態が変化することがわかる。管理指標値(Flimit, Blimit)や、様々なパラメータを変化させることで、
+
+- 短期的な漁獲量と資源回復スピードはトレードオフの関係にある
+- その度合いは魚種の生活史特性によって異なる
+- 確率変動が大きいと、うまくいかないこともある
+
+などがわかるだろう。
+
+漁業状態と資源状態を診断するkobe plotを見てみよう。
+```{r kobe_plot}
+# プロットの準備
+plot(NULL,xlim = c(0,3),ylim = c(0,3),xlab = "SSB/B_limit",ylab = "F/F_limit")
+polygon(c(-1,1,1,-1),c(-1,-1,1,1),col="khaki1",border=NA)
+polygon(c(1,6,6,1),c(-1,-1,1,1),col="olivedrab2",border=NA)
+polygon(c(1,6,6,1),c(1,1,6,6),col="khaki1",border=NA)
+polygon(c(-1,1,1,-1),c(1,1,6,6),col="indianred1",border=NA)
+
+# 管理前をプロット
+kobe_F1 <- F_tmp0[1:term,1]/F_limit_at_age
+kobe_SSB1 <- SSB2[1:term]/B_limit
+points(kobe_SSB1,kobe_F1,type = "l",col="blue")
+points(kobe_SSB1,kobe_F1,type = "p",col="blue",pch=".",cex=3)
+
+# 管理後をプロット
+kobe_F2 <- F_tmp[1:term_management,1]/F_limit_at_age
+kobe_SSB2 <- SSB3[1:term_management]/B_limit
+points(kobe_SSB2,kobe_F2,type = "l")
+points(kobe_SSB2,kobe_F2,type = "p",pch=".",cex=3)
+abline(h=1)
+abline(v=1)
+```
+
+青線が管理を実施する前、黒線が管理を実施した後である。管理を導入した年は、赤い領域（漁業：獲り過ぎ、資源：獲られ過ぎ）からオレンジ色の領域に移る。資源が回復するにつれ、緑色の領域（健全）に移る。
+
