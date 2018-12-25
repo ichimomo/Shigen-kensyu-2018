@@ -16,15 +16,15 @@
    - 交差検証
 
 
-2. 実例2: サワラ
-   - 一般化線形混合モデル (GLMM)
-   - 空間自己相関を扱ったモデル1: CAR model
-
-
-3. 実例3: ミナミマグロ
+2. 実例2: ミナミマグロ
    - zero catchを多く含むときの解析: zero-inflated model / delta GLM
    - delta GLMによる海区分け
-   - 空間自己相関を扱ったモデル2: VAST
+   
+3. 実例3: サワラ
+   - 一般化線形混合モデル (GLMM)
+   - 空間自己相関を扱ったモデル: CAR model
+
+4. VASTの紹介
 
 
-※ RのパッケージAER, MASS, mgcv, arm, lme4, CARBayes, pscl, DHARMa, mapsを使う予定ですので，実演したい人は各自でインストールお願いいたします。install.packages("パッケージ名")で大体のパッケージがインストールできると思います。できない場合はCRANのサイトからSource fileをダウンロードして、手動でインストールをお願いします。
+※ Rのパッケージarm, mgcv,AER, MASS, pscl, DHARMa, lme4, CARBayes, mapsを使う予定ですので，実演したい人は各自でインストールお願いいたします。install.packages("パッケージ名")で大体のパッケージがインストールできると思います。できない場合はCRANのサイトからSource fileをダウンロードして、手動でインストールをお願いします。
