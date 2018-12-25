@@ -7,9 +7,8 @@
 事前準備
 --------
 
--   配布したフォルダの中で1-ichinokawa内にある.RData(またはファイル名がないRのアイコン)をクリックするとRが立ち上がります　→
-    フォルダ「1-ichinokawa」内でRの作業をする準備が整いました
--   Rstudioをインストールしている人：Rのコードが書いてあるkensyu\_ichinokawa.Rファイルを右クリックし、Rstudioで開いてもOKです
+-   Rを立ち上げ、「ファイル」→「ディレクトリの変更」で、コピーした研修用のフォルダ「1-ichinokawa」を選ぶ
+-   それにより「作業ディレクトリ」が「1-ichinokawa」に移動し、ここからデータファイルやRのコードのファイルにアクセスできるようになります
 
 ---
 
@@ -17,12 +16,13 @@
 ----------------
 
 -   2-okamuraフォルダ内にある dat1.csv を読み込んでみましょう
--   関数(引数=設定, 引数=設定) という構造
--   read.csv(ファイル名)
+-   Rの基本構造：　関数(引数=設定, 引数=設定)
+-   データをRから読む関数は、read.csv(ファイル) です。
 
 <!-- -->
 
     # '../'は一個上のフォルダ、という意味です
+    # read.csvで読んだデータをcpue.dataという'オブジェクト'に入れます
     cpue.data <- read.csv("../2-okamura/dat1.csv")
 
 ---
@@ -30,7 +30,7 @@
 データの中身の確認
 ------------------
 
-    # オブジェクトの先頭の数行だけを出力する関数（オブジェクト名）
+    # オブジェクトの先頭の数行だけを出力する関数：head（オブジェクト名）
     head(cpue.data)
 
       count year site plant
@@ -41,7 +41,7 @@
     5     3    0    4  tree
     6     5    0    5  tree
 
-    # どのくらいの大きさの行列か確認する
+    # どのくらいの大きさの行列か？：dim(オブジェクト名)
     dim(cpue.data)
 
     [1] 100   4
@@ -63,7 +63,7 @@
 
     [1] 1
 
-    cpue.data$count  # '$' + 列の名前という指定のしかたもできる
+    cpue.data$count  # '$' + 列の名前という指定のしかたもできます
 
      [1]  1  1  5  6  3  5  7  6  7  9  4  4  5  6  6  9  8 10 10  9  2  2  1
     [24]  5  5  4  3  5  6  2  2  1  2  4  3  6  5  6  5  4  0  0  0  0  0  0
@@ -143,9 +143,8 @@
 ---------------------
 
 -   par : グラフのいろいろな設定をする関数です
--   par(mfrow=c(1,5)) \# 1x5列で図を並べる
--   par(ps=20) \# フォントの大きさを決める
--   par(bg="wheat") \# 背景色を決める
+-   par(mfrow=c(1,3)) \# 1x3列で図を並べる
+-   par(ps=18) \# フォントの大きさを決める
 
 ---
 
@@ -197,7 +196,7 @@
     boxplot(cpue.tree$count ~ cpue.tree$year, ylab = "CPUE", col = c("lightblue"))
     title("tree")
 
-    # treeのデータだけをとりだす
+    # こんどはshurbのデータだけをとりだす
     cpue.shrub <- subset(cpue.data, plant == "shrub")
     boxplot(cpue.shrub$count ~ cpue.shrub$year, ylab = "CPUE", col = c("lightblue"))
     title("shrub")
@@ -232,15 +231,21 @@
 別のやり方1
 ===========
 
--   1行でそれっぽいのもかけますが、、
-    ![](kensyu_ichinokawa0_files/figure-markdown_strict/unnamed-chunk-15-1.png)
+-   1行でそれっぽいのも書けますが、、
+
+<!-- -->
+
+    par(mfrow = c(1, 1))
+    boxplot(count ~ plant + site, data = cpue.data)
+
+![](kensyu_ichinokawa0_files/figure-markdown_strict/unnamed-chunk-15-1.png)
 
 ---
 
-\# 別のやり方2: ggplot2の利用
-=============================
+別のやり方2: ggplot2の利用
+==========================
 
--   ggplot2とは：きれいなグラフを簡単に書くためのパッケージ
+-   ggplot2：きれいなグラフを簡単に書くためのパッケージ
 
 <!-- -->
 
@@ -249,6 +254,13 @@
         facet_grid(~. + plant) + theme_classic(base_size = 20, base_family = "Helvetica")
 
 ---
+
+ggplot2の利点
+-------------
+
+-   何も言わなくてもいい感じの「色」を使ってくれる
+-   様々な「テーマ(theme)」を選ぶことで最初から整形された図を作る
+-   複雑なデータ構造（複数のグラフのプロット）の図を作れる
 
 ![](kensyu_ichinokawa0_files/figure-markdown_strict/unnamed-chunk-17-1.png)
 
