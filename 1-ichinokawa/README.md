@@ -8,6 +8,6 @@
    ![flow-chart](flow-chart.png)
 
 - Rと水産資源解析
-      - スライドで示したRコードはこちら https://github.com/ichimomo/Shigen-kensyu-2018/blob/master/1-ichinokawa/kensyu_ichinokawa.md
-      - pdf版もあります　https://github.com/ichimomo/Shigen-kensyu-2018/blob/master/1-ichinokawa/kensyu_ichinokawa.pdf
+   - スライドで示したRコードはこちら https://github.com/ichimomo/Shigen-kensyu-2018/blob/master/1-ichinokawa/kensyu_ichinokawa.md
+   - pdf版もあります　https://github.com/ichimomo/Shigen-kensyu-2018/blob/master/1-ichinokawa/kensyu_ichinokawa.pdf
 
