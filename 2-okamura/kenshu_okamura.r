@@ -9,24 +9,24 @@ dat1 <- read.csv("dat1.csv")   #  データの読み込み
 
 head(dat1)   #  最初の6行を表示
 
-table(dat1$count)    #  
+table(dat1$count)    #  countデータの内訳を見る
 
-plot(count~year, data=dat1)
+plot(count~year, data=dat1)    #  年トレンドのプロット
 
-tapply(dat1$count,dat1$year,mean)
+tapply(dat1$count,dat1$year,mean)     #  countデータの年平均
 
-tapply(dat1$count,list(dat1$plant,dat1$year), mean)
+tapply(dat1$count,list(dat1$plant,dat1$year), mean)         #  countデータの年/植生別の平均
 
-plot(count~year, data=subset(dat1,plant=="tree"))
-plot(count~year, data=subset(dat1,plant=="shrub"))
+plot(count~year, data=subset(dat1,plant=="tree"))      #  plant="tree"に対する年トレンド
+plot(count~year, data=subset(dat1,plant=="shrub"))       #  plant="shrub"に対する年トレンド
 
 ## 正規線形回帰モデル
 
-b <- cov(dat1$count, dat1$year)/var(dat1$year)
-a <- mean(dat1$count)-b*mean(dat1$year)
-c(a,b)
+b <- cov(dat1$count, dat1$year)/var(dat1$year)     #  　線形回帰の傾きの最小二乗推定値
+a <- mean(dat1$count)-b*mean(dat1$year)     #  　線形回帰の切片の最小二乗推定値
+c(a,b)        #  　最小二乗推定値の表示
 
-lm(count~year, data=dat1)
+lm(count~year, data=dat1)    
 
 lm(count~year*plant, data=dat1)
 
