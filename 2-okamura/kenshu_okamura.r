@@ -34,11 +34,11 @@ lm(count~year*plant, data=dat1)
 
 Res.aic <- NULL
 Sim <- 10000      
-set.seed(123)
+set.seed(1234)
 for (n in c(10,100,500,1000)){
   z <- matrix(rnorm(n*Sim, 0, 1),nrow=Sim,ncol=n)
-  TL <- apply(z,1,function(z) integrate(function(x) dnorm(x,0,1)*dnorm(x,mean(z),sqrt(var(z)*9/10),log=TRUE),-Inf,Inf)$value)
-  EL <- apply(z,1,function(z) mean(dnorm(z,mean(z),sqrt(var(z)*9/10),log=TRUE)))
+  TL <- apply(z,1,function(z) integrate(function(x) dnorm(x,0,1)*dnorm(x,mean(z),sqrt(var(z)*(n-1)/n),log=TRUE),-Inf,Inf)$value)
+  EL <- apply(z,1,function(z) mean(dnorm(z,mean(z),sqrt(var(z)*(n-1)/n),log=TRUE)))
   Res.aic <- cbind(Res.aic, n*(EL-TL))
 }
 colnames(Res.aic) <- c(10,100,500,1000)
