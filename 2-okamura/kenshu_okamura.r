@@ -38,22 +38,24 @@ set.seed(1234)      #   乱数の初期値を設定
 for (n in c(10,100,500,1000)){       #   サンプルサイズを10, 100, 500, 1000と変化させる
   z <- matrix(rnorm(n*Sim, 0, 1),nrow=Sim,ncol=n)      #   シミュレーション回数分データを発生（applyを使うため行列形式にしている）
   TL <- apply(z,1,function(z) integrate(function(x) dnorm(x,0,1)*dnorm(x,mean(z),sqrt(var(z)*(n-1)/n),log=TRUE),-Inf,Inf)$value)
-  #  平均対数尤度   \Sigma Q(x) P(x|\theta)                                      
+  #  平均対数尤度   \int Q(x) P(x|\theta)．分散に(n-1)/nを掛けているのは，不偏分散を最尤推定量にするため．dnormは正規分布の確率密度関数 dnorm(x, 平均, 標準偏差)                                       
   EL <- apply(z,1,function(z) mean(dnorm(z,mean(z),sqrt(var(z)*(n-1)/n),log=TRUE)))
+  #  標本に対する対数尤度の平均．
   Res.aic <- cbind(Res.aic, n*(EL-TL))
+  #   2つの差はパラメータ数（この場合，平均と分散の2個）になることが期待される
 }
-colnames(Res.aic) <- c(10,100,500,1000)
-colMeans(Res.aic)
+colnames(Res.aic) <- c(10,100,500,1000)     #  列の名前をサンプルサイズにする
+colMeans(Res.aic)       #  Res.aicはSim × 4の行列になっていて，列平均をとっている．これの値が2になっていれば，AICの-2*(対数尤度-パラメータ数)のパラメータ数を引くというところが正しいというのが確かめられたことになる
 
-res.n0 <- lm(count~year,data=dat1)
-res.n1 <- lm(count~year*plant,data=dat1)
-logLik(res.n0);logLik(res.n1)
-AIC(res.n0,res.n1)
+res.n0 <- lm(count~year,data=dat1)     #  count~yearの線形回帰の結果をres.n0の中に格納
+res.n1 <- lm(count~year*plant,data=dat1)        #  count~year*plantの線形回帰の結果をres.n1という変数の中に格納
+logLik(res.n0);logLik(res.n1)        #  res.n0とres.n1の対数尤度を表示
+AIC(res.n0,res.n1)        #  res.n0とres.n1のAICを表示
 
-plot(count~year,data=dat1,pch=as.numeric(plant)+1,col=as.numeric(plant)+1)
-year <- 0:9
-lines(year,res.n1$coef[1]+res.n1$coef[2]*year,col="red")
-lines(year,res.n1$coef[1]+res.n1$coef[3]+(res.n1$coef[2]+res.n1$coef[4])*year,col="green",lty=2)
+plot(count~year,data=dat1,pch=as.numeric(plant)+1,col=as.numeric(plant)+1)　　　　       # 散布図を描く．データ点の形や色をplantで変える
+year <- 0:9     #  年 0~9を変数として定義しておく
+lines(year,res.n1$coef[1]+res.n1$coef[2]*year,col="red")     #  linesでモデルから得られた線を散布図に上書きする（plant="shrub"のとき）
+lines(year,res.n1$coef[1]+res.n1$coef[3]+(res.n1$coef[2]+res.n1$coef[4])*year,col="green",lty=2)     #  linesでモデルから得られた線を散布図に上書きする（plant="tree"のとき）
 
 library(MuMIn)
 options(na.action = "na.fail") # 欠測値の取り扱いに関する設定（これをしないとdredgeが動かない）
