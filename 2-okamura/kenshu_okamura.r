@@ -66,18 +66,19 @@ dredge(res.n1,rank="AIC")   #  フルモデルから変数を除いたすべて�
 # ポアソン回帰の尤度関数
 Poisson.reg <- function(p,dat){
   lambda <- exp(p[1]+p[2]*dat$year)      # ポアソンの平均ラムダはいつも正なので，線形モデルを指数変換する．log(lambda)=a+b*yearとなるので，log link関数という．
-  -sum(dat$count*log(lambda)-lambda)     # optimなど最適化関数は最小値を
+  -sum(dat$count*log(lambda)-lambda)     # optimなど最適化関数は最小値を求めるので，対数尤度にマイナス符号をつける
 }
 
-optim(c(log(6),-0.07),Poisson.reg,dat=dat1,method="BFGS") 
+optim(c(log(6),-0.07),Poisson.reg,dat=dat1,method="BFGS")    #  optim(パラメータの初期値, 最適化する関数, データ, method=最適化の方法) 
 
-glm(count~year,family=poisson,data=dat1)
+glm(count~year,family=poisson,data=dat1)    #  count~yearのポアソン回帰   family=poissonでポアソン分布を指定
 
-glm(count~year*plant,family=poisson,data=dat1)
+glm(count~year*plant,family=poisson,data=dat1)   #  count~year+plant+year:plantのポアソン回帰
 
-res.p1 <- glm(count~year*plant,family=poisson,data=dat1)
-dredge(res.p1,rank="AIC")
+res.p1 <- glm(count~year*plant,family=poisson,data=dat1)     #  フルモデルをres.p1に格納
+dredge(res.p1,rank="AIC")      # AICでモデル選択
 
+#  正規線形回帰の場合と同様，ポアソン回帰のあてはまりの図を作成
 plot(count~year,data=dat1,pch=as.numeric(plant)+1,col=as.numeric(plant)+1)
 year <- 0:9
 lines(year,exp(res.p1$coef[1]+res.p1$coef[2]*year),col="red")
@@ -85,52 +86,57 @@ lines(year,exp(res.p1$coef[1]+res.p1$coef[3]+(res.p1$coef[2]+res.p1$coef[4])*yea
 
 ## ロジスティック回帰
 
+# ロジスティック回帰の対数尤度関数
 Logit.reg <- function(p,dat){
-  prob <- 1/(1+exp(-(p[1]+p[2]*dat$year)))
-  -sum(dat$count*log(prob)+(10-dat$count)*log(1-prob))
+  prob <- 1/(1+exp(-(p[1]+p[2]*dat$year)))     #  確率は0~1の間の数字なので，こういう変換をしてやる．逆関数はlogit=log(p/(1-p))
+  -sum(dat$count*log(prob)+(10-dat$count)*log(1-prob))     # 二項分布の式から
 }
 
-optim(c(0,0),Logit.reg,dat=dat1,method="BFGS") 
+optim(c(0,0),Logit.reg,dat=dat1,method="BFGS")    # optimで最適化
 
-glm(cbind(count,10-count)~year,family=binomial,data=dat1)
+glm(cbind(count,10-count)~year,family=binomial,data=dat1)     # glmだと cbind(成功回数，失敗回数) ~ yearのような書き方にする．他に，0と1だけの結果ならz ~ yearのような書き方も可．
 
-res.l1 <- glm(cbind(count,10-count)~year*plant,family=binomial,data=dat1)
-dredge(res.l1,rank="AIC")
+res.l1 <- glm(cbind(count,10-count)~year*plant,family=binomial,data=dat1)     # ロジスティック回帰のフルモデル
+dredge(res.l1,rank="AIC")       #  AICでモデル選択
 
 ## N-混合モデル
 
+# N混合モデルの発見関数の部分（二項分布モデル）
 detect.f <- function(p, dat, N, n=10){
-  y <- dat$count
-  X <- cbind(1,as.numeric(dat$plant)-1)
-  r <- c(1/(1+exp(-X%*%p)))
+  y <- dat$count    #  応答変数
+  X <- cbind(1,as.numeric(dat$plant)-1)     #  plantはカテゴリーなので，0 (shrub) か1 (tree)に変換してやる．model.matrix関数を使うこともできる
+  r <- c(1/(1+exp(-X%*%p)))    #  1匹あたりの発見確率をplantとリンクする．X%*%pは行列とベクトルの掛算
   
-  dbinom(y,n,1-(1-r)^N)
+  dbinom(y,n,1-(1-r)^N)     #  二項確率モデル．個体はNいるので，少なくとも1回発見する確率は1-(1-r)^Nとなる．
 }
 
-log(detect.f(c(1,1),dat1,2*dat1$count))[1:5]
+log(detect.f(c(1,1),dat1,2*dat1$count))[1:5]    #  発見モデルがちゃんと動くかテスト
 
+# N混合モデルの個体数変動の部分（ポアソン分布モデル）
 pop.f <- function(p, dat, N){
-  X <- cbind(1,dat$year)
-  lambda <- c(exp(X%*%p))
+  X <- cbind(1,dat$year)    #  説明変数の行列
+  lambda <- c(exp(X%*%p))    #  平均個体数（年で変化する）
   
-  dpois(N,lambda)
+  dpois(N,lambda)     #  ポアソン尤度
 }
 
+# N混合モデルの尤度関数
 popdet.f <- function(p, dat, max.N=100, n=10){
   Pop <- function(i) {
-    pop1 <- pop.f(p[3:4],dat[i,],0:max.N)
-    pop1 <- pop1/sum(pop1)
+    pop1 <- pop.f(p[3:4],dat[i,],0:max.N)       #  個々のデータに対して，ポアソン確率を0からmax.Nまで計算する
+    pop1 <- pop1/sum(pop1)    # max.N=100で打ち切ったので，確率にするため全部の和で割ってやる
     pop1
   }
-  like <- sapply(1:nrow(dat), function(i) sum(detect.f(p[1:2],dat[i,],0:max.N,n)*Pop(i)))
-  -sum(log(like))
+  like <- sapply(1:nrow(dat), function(i) sum(detect.f(p[1:2],dat[i,],0:max.N,n)*Pop(i)))      #  0~max.Nを足し合わせた周辺尤度関数を各データ（行）に対して計算
+  -sum(log(like))    # 対数尤度にして足し合わせる
 }
 
-(res.nm <- optim(c(0,0,0,0),popdet.f,dat=dat1,max.N=100,method="BFGS"))
+(res.nm <- optim(c(0,0,0,0),popdet.f,dat=dat1,max.N=100,method="BFGS"))     # optimで最適化  ()でくくると結果が表示される
 
-table(dat1$plant,dat1$year)
+table(dat1$plant,dat1$year)      #  plantのyearによる変化を見てやって，個体数変化の解釈をする
 
-plot(count~year,data=dat1)
+# N混合モデルの曲線をプロットしてやる
+plot(count~year,data=dat1)      
 lines(year,exp(res.nm$par[3]+res.nm$par[4]*year))
 
 ## 精度計算と信頼区間（対数正規モデル） 
