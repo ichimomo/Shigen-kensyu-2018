@@ -38,7 +38,7 @@ set.seed(1234)      #   乱数の初期値を設定
 for (n in c(10,100,500,1000)){       #   サンプルサイズを10, 100, 500, 1000と変化させる
   z <- matrix(rnorm(n*Sim, 0, 1),nrow=Sim,ncol=n)      #   シミュレーション回数分データを発生（applyを使うため行列形式にしている）
   TL <- apply(z,1,function(z) integrate(function(x) dnorm(x,0,1)*dnorm(x,mean(z),sqrt(var(z)*(n-1)/n),log=TRUE),-Inf,Inf)$value)
-  #  平均対数尤度   \int Q(x) P(x|\theta)．分散に(n-1)/nを掛けているのは，不偏分散を最尤推定量にするため．dnormは正規分布の確率密度関数 dnorm(x, 平均, 標準偏差)                                       
+  #  平均対数尤度   \int Q(x) P(x|\theta)．分散に(n-1)/nを掛けているのは，不偏分散を最尤推定量にするため（研修ではここ間違ってました．失礼しました）．dnormは正規分布の確率密度関数 dnorm(x, 平均, 標準偏差)                                       
   EL <- apply(z,1,function(z) mean(dnorm(z,mean(z),sqrt(var(z)*(n-1)/n),log=TRUE)))
   #  標本に対する対数尤度の平均．
   Res.aic <- cbind(Res.aic, n*(EL-TL))
@@ -57,15 +57,16 @@ year <- 0:9     #  年 0~9を変数として定義しておく
 lines(year,res.n1$coef[1]+res.n1$coef[2]*year,col="red")     #  linesでモデルから得られた線を散布図に上書きする（plant="shrub"のとき）
 lines(year,res.n1$coef[1]+res.n1$coef[3]+(res.n1$coef[2]+res.n1$coef[4])*year,col="green",lty=2)     #  linesでモデルから得られた線を散布図に上書きする（plant="tree"のとき）
 
-library(MuMIn)
-options(na.action = "na.fail") # 欠測値の取り扱いに関する設定（これをしないとdredgeが動かない）
-dredge(res.n1,rank="AIC")
+library(MuMIn)     # モデル選択を行うためのパッケージ．installしてない人は事前にinstall.packages("MuMIn")としてください．
+options(na.action = "na.fail") # 欠測値の取り扱いに関する設定（これをしないとdredgeが動かない）．欠測値があったときに，欠測値を無視しない．
+dredge(res.n1,rank="AIC")   #  フルモデルから変数を除いたすべての組み合わせでモデルを比較．rank="AIC"でAICを使う（defaultはAICc）
 
 ## ポアソン回帰
 
+# ポアソン回帰の尤度関数
 Poisson.reg <- function(p,dat){
-  lambda <- exp(p[1]+p[2]*dat$year)
-  -sum(dat$count*log(lambda)-lambda)
+  lambda <- exp(p[1]+p[2]*dat$year)      # ポアソンの平均ラムダはいつも正なので，線形モデルを指数変換する．log(lambda)=a+b*yearとなるので，log link関数という．
+  -sum(dat$count*log(lambda)-lambda)     # optimなど最適化関数は最小値を
 }
 
 optim(c(log(6),-0.07),Poisson.reg,dat=dat1,method="BFGS") 
