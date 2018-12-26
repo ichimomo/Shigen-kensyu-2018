@@ -26,18 +26,19 @@ b <- cov(dat1$count, dat1$year)/var(dat1$year)     #  　線形回帰の傾き�
 a <- mean(dat1$count)-b*mean(dat1$year)     #  　線形回帰の切片の最小二乗推定値
 c(a,b)        #  　最小二乗推定値の表示
 
-lm(count~year, data=dat1)    
+lm(count~year, data=dat1)        #    countの年変化の線形回帰      
 
-lm(count~year*plant, data=dat1)
+lm(count~year*plant, data=dat1)       #    count~year+plant+year:plantの線形回帰      
 
 # AICのシミュレーション
 
-Res.aic <- NULL
-Sim <- 10000      
-set.seed(1234)
-for (n in c(10,100,500,1000)){
-  z <- matrix(rnorm(n*Sim, 0, 1),nrow=Sim,ncol=n)
+Res.aic <- NULL     #   結果の入れ物を作る
+Sim <- 10000      #   シミュレーション回数（10000回ぐらいしないと良い結果にならない）
+set.seed(1234)      #   乱数の初期値を設定
+for (n in c(10,100,500,1000)){       #   サンプルサイズを10, 100, 500, 1000と変化させる
+  z <- matrix(rnorm(n*Sim, 0, 1),nrow=Sim,ncol=n)      #   シミュレーション回数分データを発生（applyを使うため行列形式にしている）
   TL <- apply(z,1,function(z) integrate(function(x) dnorm(x,0,1)*dnorm(x,mean(z),sqrt(var(z)*(n-1)/n),log=TRUE),-Inf,Inf)$value)
+  #  平均対数尤度   \Sigma Q(x) P(x|\theta)                                      
   EL <- apply(z,1,function(z) mean(dnorm(z,mean(z),sqrt(var(z)*(n-1)/n),log=TRUE)))
   Res.aic <- cbind(Res.aic, n*(EL-TL))
 }
