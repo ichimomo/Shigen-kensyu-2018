@@ -5,11 +5,11 @@
 
 ## データの読み込みと下調べ
 
-dat1 <- read.csv("dat1.csv")
+dat1 <- read.csv("dat1.csv")   #  データの読み込み
 
-head(dat1)
+head(dat1)   #  最初の6行を表示
 
-table(dat1$count)
+table(dat1$count)    #  
 
 plot(count~year, data=dat1)
 
