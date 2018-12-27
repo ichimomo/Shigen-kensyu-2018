@@ -1,0 +1,4 @@
+# Excel files (data files)
+*.csv
+*.xls
+*.xlsx
