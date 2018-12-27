@@ -230,16 +230,19 @@ for (i in 1:B){
   res.nm.cb <- optim(c(0,0,0,0),popdet.f,dat=dat1.cb,max.N=100,method="BFGS")     # N混合モデルによるパラメータ推定
   b.nm <- rbind(b.nm, exp(res.nm.cb$par[3]+res.nm.cb$par[4]*year))      # 0~9年の個体数推定値を計算
 }
-CI.cb <- apply(b.nm,2,quantile,probs=c(0.025,0.975))
+CI.cb <- apply(b.nm,2,quantile,probs=c(0.025,0.975))       # 信頼区間を計算
 
+# N混合モデルのブートストラップ信頼区間をプロット                     
 plot(count~year,data=dat1)
 lines(year,E.N)
 arrows(year,CI.cb[1,],year,CI.cb[2,],angle=90,code=3,length=0.03,col="blue")
 
 ## Template Model Builder実例
-
-sink("nm.cpp")
-cat("// N-mixture model
+# 上のN混合モデルのbooststrap計算は結構時間がかかる．そこでTMBを使って高速化してやる．
+                     
+sink("nm.cpp")      # nm.cppというcppファイルを作ってやる．
+#  nm.cppにTMBのための関数を書いてやる．
+cat("// N-mixture model       
 
 #include <TMB.hpp>
 
@@ -285,17 +288,19 @@ Type objective_function<Type>::operator() ()
 }",fill=TRUE)
 sink()
 
-library(TMB)
-compile("nm.cpp")
-dyn.load(dynlib("nm"))
+library(TMB)     # TMBを読み込む
+compile("nm.cpp")      #  nm.cppをコンパイル
+dyn.load(dynlib("nm"))     # nmの実行ファイルを作る
 
+#  TMB用にデータを加工する
 dat2 <- dat1[,-3]
 dat2[,3] <- as.numeric(dat2[,3])-1
 dat <- list(Nmax=100, n=10, DAT=as.matrix(dat2))
 parms <- list(P=c(0,0,0,0))
-obj <- MakeADFun(data=dat,parameters=parms,DLL="nm")
-(res.nm.tmb <- optim(obj$par,obj$fn,obj$gr,method="BFGS",hessian=TRUE))
+obj <- MakeADFun(data=dat,parameters=parms,DLL="nm")      # これで自動微分した関数を作ってやる
+(res.nm.tmb <- optim(obj$par,obj$fn,obj$gr,method="BFGS",hessian=TRUE))      #  自動微分により得られたgradientなどを使うことにより高速化
 
+#  上のTMB関数を使ってブートストラップ信頼区間を計算する
 dat1.cb.tmb <- dat1
 d <- 10^(-10)
 b.nm.tmb <- NULL
@@ -311,6 +316,7 @@ for (i in 1:B){
 }
 CI.cb.tmb <- apply(b.nm.tmb,2,quantile,probs=c(0.025,0.975))
 
+#  TMBで作ったブートストラップ信頼区間を描画する                         
 plot(count~year,data=dat1)
 lines(year,E.N)
 arrows(year,CI.cb.tmb[1,],year,CI.cb.tmb[2,],angle=90,code=3,length=0.03,col="blue")
