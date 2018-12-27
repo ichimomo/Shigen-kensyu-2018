@@ -141,13 +141,17 @@ lines(year,exp(res.nm$par[3]+res.nm$par[4]*year))
 
 ## 精度計算と信頼区間（対数正規モデル） 
 
+# 精度計算のため，hessian=TRUEとしてヘッセ行列を取り出す
 (res.nm <- optim(c(0,0,0,0),popdet.f,dat=dat1,max.N=100,method="BFGS",hessian=TRUE))
 
+# ヘッセ行列の逆行列はパラメータ推定値の分散共分散行列になっている
 (var.nm <- solve(res.nm$hessian))
 
+# パラメータは個体数をlog scaleで見たものなので元のスケールに戻してやる
 pred.N <- function(p,year) exp(p[3]+p[4]*year)
 (E.N <- pred.N(res.nm$par,year))
 
+# 個体数推定値をパラメータで微分したもの（数値微分）を計算して，デルタ法で個体数の分散や標準誤差，CVを計算                 
 DN <- function(p,year,d=0.0001){
   dp <- diag(d,length(p))
   apply(dp,1,function(x) (pred.N(p+x,year)-pred.N(p-x,year))/(2*d))
@@ -158,6 +162,7 @@ dN <- DN(res.nm$par,0:9)
 
 (CV.N <- se.N/E.N)
 
+# 上のCVを使って対数正規の95%信頼区間をプロットしてやる                
 plot(count~year,data=dat1)
 lines(year,E.N)
 alpha <- 0.05
@@ -167,34 +172,41 @@ Up.lim <- E.N*C.ci
 arrows(year,Lo.lim,year,Up.lim,angle=90,code=3,length=0.03,col="blue") 
 
 ## ブートストラップ信頼区間
+# 上では対数正規を使ったが，個体数に対数正規の仮定をおかないで信頼区間を作りたい
 
+# ノンパラメトリックブートストラップ
 B <- 1000
 b.boot <- NULL
 for (i in 1:B){
-  res.n0.b <- lm(count~year, data=dat1[sample(100,replace=TRUE),])
-  b.boot <- c(b.boot, res.n0.b$coef[2])
+  res.n0.b <- lm(count~year, data=dat1[sample(100,replace=TRUE),])    # リサンプリングしたデータに線形回帰をフィット
+  b.boot <- c(b.boot, res.n0.b$coef[2])     #  傾きの推定値をとっておく
 }
-quantile(b.boot,probs=c(0.025,0.975))
+quantile(b.boot,probs=c(0.025,0.975))     #  quantile関数で95%信頼区間を出す
 
-resid.n0 <- residuals(res.n0)
+# 残差ブートストラップ
+# 上のノンパラブートストラップでは，説明変数の出現頻度も変わってしまう，それが望ましくない場合もある．そこで残差をブートストラップする．
+resid.n0 <- residuals(res.n0)     #  残差を計算
 b.rb <- NULL
 for (i in 1:B){
-  count.rb <- dat1$count+resid.n0[sample(100,replace=TRUE)]
-  res.n0.rb <- lm(count.rb~year, data=dat1)
-  b.rb <- c(b.rb, res.n0.rb$coef[2])
+  count.rb <- predict(res.n0)+resid.n0[sample(100,replace=TRUE)]      #  リサンプリングした残差を予測値に足して，新たなデータを作る（ここも研修のとき間違ったコードでした．すいません）
+  res.n0.rb <- lm(count.rb~year, data=dat1)     # 新たなデータに線形回帰モデルをフィット
+  b.rb <- c(b.rb, res.n0.rb$coef[2])      #  傾きをとっておく
 }
-quantile(b.rb,probs=c(0.025,0.975))
+quantile(b.rb,probs=c(0.025,0.975))     #  95%信頼区間
 
-res.p0 <- glm(count~year,family=poisson,data=dat1)
-pred.p0 <- predict(res.p0,type="response")
+#  パラメトリックブートストラップ
+#  ポアソンの場合，カウントデータが応答変数になるので残差ブートストラップは望ましくない
+res.p0 <- glm(count~year,family=poisson,data=dat1)     #  ポアソン回帰の結果
+pred.p0 <- predict(res.p0,type="response")     # 予測値を計算してやる．predictはdefaultで線形予測子を返すので，type="response"として元のスケールに戻してやる（正規分布の場合はidentity linkなのでこの操作必要なかった）
 b.pb <- NULL
 for (i in 1:B){
-  count.pb <- rpois(100,pred.p0)
-  res.p0.pb <- glm(count.pb~year,family=poisson,data=dat1)
-  b.pb <- c(b.pb, res.p0.pb$coef[2])
+  count.pb <- rpois(100,pred.p0)      #  予測値を使ってポアソン乱数を発生
+  res.p0.pb <- glm(count.pb~year,family=poisson,data=dat1)      #  生成したデータにポアソン回帰を実行
+  b.pb <- c(b.pb, res.p0.pb$coef[2])    #  傾きを記録する
 }
-quantile(b.pb,probs=c(0.025,0.975))
+quantile(b.pb,probs=c(0.025,0.975))     #  95%信頼区間
 
+# N混合モデルの確率を計算する関数
 dnm <- function(x, p, year, plant, max.N=100, n=10){
   lambda <- exp(p[3]+p[4]*year)
   pop1 <- dpois(0:max.N,lambda)
@@ -204,18 +216,19 @@ dnm <- function(x, p, year, plant, max.N=100, n=10){
   sum(dbinom(x,n,1-(1-r)^(0:max.N))*pop1)
 }
 
+# 各データに対して，発見数が0から10までの場合の確率を計算してやる                
 prob.nm <- sapply(1:100, function(i) sapply(0:10,function(x) dnm(x,res.nm$par,as.numeric(dat1$year[i]),as.numeric(dat1$plant[i])-1)))
-cprob.nm <- apply(prob.nm,2,cumsum)
+cprob.nm <- apply(prob.nm,2,cumsum)     #  累積確率分布を計算
 
 dat1.cb <- dat1
-d <- 10^(-10)
+d <- 10^(-10)     #  数値計算の精度の調整のために必要
 b.nm <- NULL
 for (i in 1:B){
-  z.cb <- runif(100,0,1)
-  count.nm <- sapply(1:100, function(x) which(cprob.nm[,x] >= z.cb[x]-d)[1]-1)
-  dat1.cb$count <- count.nm
-  res.nm.cb <- optim(c(0,0,0,0),popdet.f,dat=dat1.cb,max.N=100,method="BFGS")
-  b.nm <- rbind(b.nm, exp(res.nm.cb$par[3]+res.nm.cb$par[4]*year))
+  z.cb <- runif(100,0,1)      # 一様乱数を発生
+  count.nm <- sapply(1:100, function(x) which(cprob.nm[,x] >= z.cb[x]-d)[1]-1)     #  上で計算した累積確率との比較で，データ（0~10）を作り出してやる
+  dat1.cb$count <- count.nm      #  できたデータを応答変数にする
+  res.nm.cb <- optim(c(0,0,0,0),popdet.f,dat=dat1.cb,max.N=100,method="BFGS")     # N混合モデルによるパラメータ推定
+  b.nm <- rbind(b.nm, exp(res.nm.cb$par[3]+res.nm.cb$par[4]*year))      # 0~9年の個体数推定値を計算
 }
 CI.cb <- apply(b.nm,2,quantile,probs=c(0.025,0.975))
 
