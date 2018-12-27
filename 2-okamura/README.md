@@ -21,5 +21,5 @@ Template Model Builderの実例
 RtoolsのHP:
 https://cran.r-project.org/bin/windows/Rtools/
 
-H28年度の資源管理研修
+H28年度の資源管理研修（シミュレーションや機械学習の手法について扱った回）
 https://sites.google.com/site/hirosukeokamura/h28
