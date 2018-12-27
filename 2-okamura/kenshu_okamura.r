@@ -1,4 +1,4 @@
-## Kenshu 2018.12.
+## Kenshu 2018.12.26
 ## 岡村
 ## 必要なRパッケージなど：MuMIn，TMB，Rtools
 ##
@@ -300,7 +300,7 @@ parms <- list(P=c(0,0,0,0))
 obj <- MakeADFun(data=dat,parameters=parms,DLL="nm")      # これで自動微分した関数を作ってやる
 (res.nm.tmb <- optim(obj$par,obj$fn,obj$gr,method="BFGS",hessian=TRUE))      #  自動微分により得られたgradientなどを使うことにより高速化
 
-#  上のTMB関数を使ってブートストラップ信頼区間を計算する
+#  上のTMB関数を使ってブートストラップ信頼区間を計算する．TMBを使わない場合に比べて大分速くなる．
 dat1.cb.tmb <- dat1
 d <- 10^(-10)
 b.nm.tmb <- NULL
